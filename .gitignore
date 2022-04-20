@@ -116,3 +116,6 @@ hs_err_pid*
 
 # Cache of project
 .gradletasknamecache
+
+# Local build properties
+/local.properties
