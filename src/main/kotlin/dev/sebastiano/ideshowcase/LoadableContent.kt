@@ -6,7 +6,7 @@ sealed class LoadableContent {
 
     object Loading : LoadableContent()
 
-    data class Error(val message: String, val retryAction: (() -> Unit)?) : LoadableContent()
+    data class Error(val message: String, val retryAction: (() -> Unit)? = null) : LoadableContent()
 
     data class Content<T : Any>(val data: T) : LoadableContent()
 }

@@ -17,6 +17,7 @@ dependencies {
     implementation(compose.desktop.currentOs)
     implementation("ch.qos.logback:logback-classic:1.2.10")
     implementation("com.arkivanov.decompose:decompose:0.6.0")
+    implementation("com.arkivanov.decompose:extensions-compose-jetbrains:0.6.0")
     implementation("com.github.twitch4j:twitch4j:1.9.0")
     implementation("io.github.chozzle:compose-macos-theme-desktop:0.4.2")
     implementation("io.ktor:ktor-client-core:$ktorVersion")

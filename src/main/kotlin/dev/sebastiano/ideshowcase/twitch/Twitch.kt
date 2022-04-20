@@ -14,11 +14,10 @@ internal class Twitch(
 
     suspend fun fetchUserInfo(username: String): TwitchUser {
         val credentials = obtainCredentials()
-
         return repository.fetchUserInfo(credentials, username)
     }
 
-    private suspend fun obtainCredentials(): Credentials {
+    private fun obtainCredentials(): Credentials {
         val clientId = checkNotNull(properties.getProperty("twitch_client_id")) { "Missing the twitch_client_id in local.properties" }
         return Credentials(clientId)
     }
