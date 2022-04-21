@@ -12,17 +12,17 @@ repositories {
     mavenCentral()
 }
 
-val ktorVersion = "2.0.0"
 dependencies {
     implementation(compose.desktop.currentOs)
-    implementation("ch.qos.logback:logback-classic:1.2.10")
+    implementation("ch.qos.logback:logback-classic:1.2.11")
     implementation("com.arkivanov.decompose:decompose:0.6.0")
     implementation("com.arkivanov.decompose:extensions-compose-jetbrains:0.6.0")
-    implementation("com.github.twitch4j:twitch4j:1.9.0")
+    implementation("com.twitter:twitter-api-java-sdk:1.1.4")
     implementation("io.github.chozzle:compose-macos-theme-desktop:0.4.2")
-    implementation("io.ktor:ktor-client-core:$ktorVersion")
-    implementation("io.ktor:ktor-client-logging:$ktorVersion")
-    implementation("io.ktor:ktor-client-okhttp:$ktorVersion")
+    implementation("com.squareup.okhttp3:okhttp:4.9.3")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.9.3")
+    implementation("com.alialbaali.kamel:kamel-image:0.3.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.6.1")
 }
 
 kotlin {
