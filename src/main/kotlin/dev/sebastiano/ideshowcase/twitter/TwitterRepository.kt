@@ -34,7 +34,7 @@ private class TwitterApiV2Repository : TwitterRepository {
         }
 
     override suspend fun fetchUserInfo(credentials: Twitter.Credentials, username: String): User {
-        val fields = setOf("created_at", "description", "location", "profile_image_url", "public_metrics", "url", "verified")
+        val fields = setOf("created_at", "description", "location", "profile_image_url", "public_metrics", "url", "verified", "entities", "protected")
         val response = twitterClient(credentials).users()
             .findUserByUsername(username, /* expansions = */ emptySet(), /* tweetFields = */ emptySet(), /* userFields = */ fields)
 

@@ -46,6 +46,8 @@ import androidx.compose.ui.input.pointer.PointerIconDefaults
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -62,6 +64,9 @@ import io.chozzle.composemacostheme.modifiedofficial.MacOutlinedTextField
 import io.kamel.image.KamelImage
 import io.kamel.image.lazyPainterResource
 import kotlinx.coroutines.Dispatchers
+import java.net.URI
+import java.time.format.TextStyle
+import java.util.Locale
 
 fun main() {
     application(exitProcessOnExit = true) {
@@ -163,7 +168,7 @@ internal fun MainWindowContent(viewModel: TwitterUserViewModel, modifier: Modifi
                     Image(
                         painterResource("loading-spinner.png"),
                         contentDescription = null,
-                        Modifier.size(16.dp).rotate(currentRotation).alpha(ContentAlpha.disabled)
+                        Modifier.size(48.dp).rotate(currentRotation).alpha(ContentAlpha.disabled)
                     )
                 }
             }
@@ -194,6 +199,9 @@ internal fun MainWindowContent(viewModel: TwitterUserViewModel, modifier: Modifi
             }
             is LoadableContent.Content<*> -> {
                 val (_, user) = state.asContentOrNull<TwitterUserViewModel.StateModel>()!!.data
+
+                val secondaryColor = Color(0xFF536571)
+
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (user == null) {
                         Box(Modifier.size(72.dp).clip(CircleShape).background(Color(0xFFCECECE))) {
@@ -230,7 +238,7 @@ internal fun MainWindowContent(viewModel: TwitterUserViewModel, modifier: Modifi
                         }
                     } else {
                         KamelImage(
-                            lazyPainterResource(user.profileImageUrl ?: ""),
+                            lazyPainterResource(user.profileImageUrl.toOriginalSizePicture() ?: ""),
                             contentDescription = null,
                             modifier = Modifier.size(72.dp).clip(CircleShape).background(Color(0xFFCECECE)),
                             onLoading = {
@@ -277,17 +285,98 @@ internal fun MainWindowContent(viewModel: TwitterUserViewModel, modifier: Modifi
 
                     Spacer(Modifier.width(16.dp))
 
-                    Text(username, style = MaterialTheme.typography.h2)
+                    val displayedName = user?.name ?: username
+                    Text(displayedName, style = MaterialTheme.typography.h3)
                 }
 
-                Spacer(Modifier.height(24.dp))
+                if (user != null) {
+                    Row(Modifier.padding(start = 88.dp, end = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("@$username", color = secondaryColor)
+
+                        if (user.verified == true) {
+                            Spacer(Modifier.width(4.dp))
+                            Image(painterResource("verified.svg"), contentDescription = "Verified", Modifier.size(16.dp))
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
 
                 if (user != null) {
-                    if (user.createdAt != null) Text("Member since: ${user.createdAt!!.year}")
+                    if (!user.description.isNullOrBlank()) {
+                        // TODO apply entities from the entities field
+                        Text(user.description!!.trim(), Modifier.padding(start = 88.dp, end = 24.dp))
+                        Spacer(Modifier.height(24.dp))
+                    }
+
+                    if (user.publicMetrics != null) {
+                        val publicMetrics = user.publicMetrics!!
+                        Row(
+                            Modifier.padding(start = 88.dp, end = 24.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                buildAnnotatedString {
+                                    pushStyle(SpanStyle(fontWeight = FontWeight.SemiBold))
+                                    append(publicMetrics.followingCount.toString())
+                                    pop()
+                                    pushStyle(SpanStyle(color = secondaryColor))
+                                    append(" following")
+                                }
+                            )
+
+                            Text(
+                                buildAnnotatedString {
+                                    pushStyle(SpanStyle(fontWeight = FontWeight.SemiBold))
+                                    append(publicMetrics.followersCount.toString())
+                                    pop()
+                                    pushStyle(SpanStyle(color = secondaryColor))
+                                    append(" followers")
+                                }
+                            )
+                        }
+
+                        Spacer(Modifier.height(8.dp))
+                    }
+
+                    Row(
+                        Modifier.padding(start = 88.dp, end = 24.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (user.location != null) {
+                            Image(painterResource("location.svg"), contentDescription = null, modifier = Modifier.size(24.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(user.location!!, color = secondaryColor)
+                            Spacer(Modifier.width(16.dp))
+                        }
+
+                        if (user.url != null) {
+                            Image(painterResource("url.svg"), contentDescription = null, modifier = Modifier.size(24.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(user.entities?.url?.urls?.firstOrNull()?.displayUrl ?: user.url!!, color = secondaryColor)
+                            Spacer(Modifier.width(16.dp))
+                        }
+
+                        if (user.createdAt != null) {
+                            Image(painterResource("joined.svg"), contentDescription = null, modifier = Modifier.size(24.dp))
+                            Spacer(Modifier.width(4.dp))
+                            val createdAt = user.createdAt!!
+                            Text(
+                                "Joined ${createdAt.month.getDisplayName(TextStyle.FULL, Locale.getDefault())} ${createdAt.year}",
+                                color = secondaryColor
+                            )
+                        }
+                    }
                 }
             }
         }
     }
+}
+
+private fun URI?.toOriginalSizePicture(): String? {
+    if (this == null) return null
+    return toString().replace("_normal.", ".")
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
