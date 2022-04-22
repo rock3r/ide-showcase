@@ -23,6 +23,9 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor:4.9.3")
     implementation("com.alialbaali.kamel:kamel-image:0.3.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.6.1")
+
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.8.2")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.8.2")
 }
 
 kotlin {
@@ -33,4 +36,8 @@ kotlin {
 
 tasks.withType<KotlinCompile> {
     kotlinOptions.jvmTarget = "1.8"
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
