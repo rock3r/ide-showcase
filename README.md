@@ -26,4 +26,4 @@ should **never** be considered as a template or source of wisdom.
 It is bad, and has been purposefully left in a terrible state to demonstrate how much
 time you can save by mastering your IDE.
 
-Again, please do **NOT** learn anything from this code. It'll make you dumber. 🫣
+Again, please do **NOT** learn anything from this code. It'll make you dumber. 🫣 I MEAN IT!
