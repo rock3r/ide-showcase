@@ -1,0 +1,28 @@
+Exception in thread "AWT-EventQueue-0" java.lang.IllegalStateException: Hello everyone!
+	at dev.sebastiano.ideshowcase.twitter.TwitterUserViewModel.loadUser(TwitterUserViewModel.kt:25)
+	at dev.sebastiano.ideshowcase.MainKt$MainWindowContent$1.invokeSuspend(Main.kt:99)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:106)
+	at androidx.compose.ui.platform.FlushCoroutineDispatcher$dispatch$2$1.invoke(CoroutineDispatchers.skiko.kt:51)
+	at androidx.compose.ui.platform.FlushCoroutineDispatcher$dispatch$2$1.invoke(CoroutineDispatchers.skiko.kt:46)
+	at androidx.compose.ui.platform.FlushCoroutineDispatcher.performRun(CoroutineDispatchers.skiko.kt:78)
+	at androidx.compose.ui.platform.FlushCoroutineDispatcher.access$performRun(CoroutineDispatchers.skiko.kt:29)
+	at androidx.compose.ui.platform.FlushCoroutineDispatcher$dispatch$2.invokeSuspend(CoroutineDispatchers.skiko.kt:46)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:106)
+	at java.desktop/java.awt.event.InvocationEvent.dispatch(InvocationEvent.java:313)
+	at java.desktop/java.awt.EventQueue.dispatchEventImpl(EventQueue.java:770)
+	at java.desktop/java.awt.EventQueue$4.run(EventQueue.java:721)
+	at java.desktop/java.awt.EventQueue$4.run(EventQueue.java:715)
+	at java.base/java.security.AccessController.doPrivileged(Native Method)
+	at java.base/java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege(ProtectionDomain.java:85)
+	at java.desktop/java.awt.EventQueue.dispatchEvent(EventQueue.java:740)
+	at java.desktop/java.awt.EventDispatchThread.pumpOneEventForFilters(EventDispatchThread.java:203)
+	at java.desktop/java.awt.EventDispatchThread.pumpEventsForFilter(EventDispatchThread.java:124)
+	at java.desktop/java.awt.EventDispatchThread.pumpEventsForHierarchy(EventDispatchThread.java:113)
+	at java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:109)
+	at java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:101)
+	at java.desktop/java.awt.EventDispatchThread.run(EventDispatchThread.java:90)
+	Suppressed: kotlinx.coroutines.DiagnosticCoroutineContextException: [androidx.compose.ui.awt.ComposeLayer$coroutineExceptionHandler$1@61359c2e, androidx.compose.runtime.BroadcastFrameClock@1fb39f8e, StandaloneCoroutine{Cancelling}@3e5d0674, FlushCoroutineDispatcher@6e612de0]
+
+Process finished with exit code 0
