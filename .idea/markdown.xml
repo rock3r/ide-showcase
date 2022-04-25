@@ -3,6 +3,7 @@
   <component name="MarkdownSettings">
     <option name="customStylesheetPath" value="C:\src\ide-showcase\slides\slides.css" />
     <option name="customStylesheetText" value="li {&#10;    margin-top: .5em;&#10;}                  &#10;&#10;li img {&#10;    margin-top: .5em;&#10;    margin-bottom: .2em;&#10;}&#10;&#10;li em img {&#10;    margin: 0&#10;}&#10;&#10;body {&#10;    font-size: 24pt;&#10;}&#10;" />
+    <option name="splitLayout" value="SHOW_PREVIEW" />
     <option name="useCustomStylesheetText" value="$IS_LOCAL_BUILD$" />
   </component>
 </project>
