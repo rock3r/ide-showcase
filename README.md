@@ -15,6 +15,8 @@
 <br/>
 <br/>
 
+Find the "slides" on [https://go.sebastiano.dev/ide-talk-2022](https://go.sebastiano.dev/ide-talk-2022)
+
 ➡️ [GO TO "SLIDES"](slides/001.md)
 
 ### ⚠️ A note about the sample code
