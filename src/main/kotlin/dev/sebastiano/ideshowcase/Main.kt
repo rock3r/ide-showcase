@@ -9,6 +9,7 @@ import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.ContentAlpha
 import androidx.compose.material.LocalContentColor
+import androidx.compose.material.LocalTextStyle
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.TextButton
@@ -44,19 +46,30 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIconDefaults
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.arkivanov.decompose.extensions.compose.jetbrains.subscribeAsState
+import com.twitter.clientlib.model.CashtagEntity
+import com.twitter.clientlib.model.FullTextEntities
+import com.twitter.clientlib.model.HashtagEntity
+import com.twitter.clientlib.model.MentionEntity
+import com.twitter.clientlib.model.UrlEntity
 import dev.sebastiano.ideshowcase.twitter.TwitterUserViewModel
 import dev.sebastiano.ideshowcase.twitter.asContentOrNull
 import io.chozzle.composemacostheme.MacTheme
@@ -64,9 +77,16 @@ import io.chozzle.composemacostheme.modifiedofficial.MacOutlinedTextField
 import io.kamel.image.KamelImage
 import io.kamel.image.lazyPainterResource
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.slf4j.LoggerFactory
+import java.awt.Desktop
 import java.net.URI
+import java.net.URL
 import java.time.format.TextStyle
-import java.util.Locale
+import java.util.*
+
+private val logger = LoggerFactory.getLogger("SampleLog")
 
 fun main() {
     application(exitProcessOnExit = true) {
@@ -88,6 +108,7 @@ fun main() {
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Preview
 @Composable
 internal fun MainWindowContent(viewModel: TwitterUserViewModel, modifier: Modifier = Modifier) {
@@ -138,6 +159,7 @@ internal fun MainWindowContent(viewModel: TwitterUserViewModel, modifier: Modifi
                     Text("Nothing to see here", color = LocalContentColor.current.copy(alpha = ContentAlpha.disabled))
                 }
             }
+
             is LoadableContent.Loading -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     val transition = rememberInfiniteTransition()
@@ -172,9 +194,10 @@ internal fun MainWindowContent(viewModel: TwitterUserViewModel, modifier: Modifi
                     )
                 }
             }
+
             is LoadableContent.Error -> {
                 Column(
-                    Modifier.fillMaxSize(),
+                    Modifier.fillMaxSize().padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -197,12 +220,13 @@ internal fun MainWindowContent(viewModel: TwitterUserViewModel, modifier: Modifi
                     )
                 }
             }
+
             is LoadableContent.Content<*> -> {
                 val (_, user) = state.asContentOrNull<TwitterUserViewModel.StateModel>()!!.data
 
                 val secondaryColor = Color(0xFF536571)
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 16.dp)) {
                     if (user == null) {
                         Box(Modifier.size(72.dp).clip(CircleShape).background(Color(0xFFCECECE))) {
                             val transition = rememberInfiniteTransition()
@@ -239,7 +263,7 @@ internal fun MainWindowContent(viewModel: TwitterUserViewModel, modifier: Modifi
                     } else {
                         KamelImage(
                             lazyPainterResource(user.profileImageUrl.toOriginalSizePicture() ?: ""),
-                            contentDescription = null,
+                            contentDescription = "$username's profile picture",
                             modifier = Modifier.size(72.dp).clip(CircleShape).background(Color(0xFFCECECE)),
                             onLoading = {
                                 Box(Modifier.size(72.dp).clip(CircleShape).background(Color(0xFFCECECE))) {
@@ -271,13 +295,23 @@ internal fun MainWindowContent(viewModel: TwitterUserViewModel, modifier: Modifi
                                     Image(
                                         painterResource("loading-spinner.png"),
                                         contentDescription = null,
-                                        Modifier.size(16.dp).rotate(currentRotation).padding(start = 16.dp).alpha(ContentAlpha.disabled)
+                                        Modifier.size(16.dp).rotate(currentRotation).padding(start = 16.dp)
+                                            .alpha(ContentAlpha.disabled)
                                     )
                                 }
                             },
-                            onFailure = {
+                            onFailure = { error ->
+                                logger.error(
+                                    "Unable to load profile pic for $username at ${user.profileImageUrl.toOriginalSizePicture()}",
+                                    error
+                                )
                                 Box(Modifier.size(72.dp).clip(CircleShape).background(Color(0xFFCECECE))) {
-                                    Text(":(", Modifier.align(Alignment.Center), fontSize = MaterialTheme.typography.h4.fontSize, color = Color.Red)
+                                    Text(
+                                        ":(",
+                                        Modifier.align(Alignment.Center),
+                                        fontSize = MaterialTheme.typography.h4.fontSize,
+                                        color = Color.Red
+                                    )
                                 }
                             }
                         )
@@ -290,29 +324,47 @@ internal fun MainWindowContent(viewModel: TwitterUserViewModel, modifier: Modifi
                 }
 
                 if (user != null) {
-                    Row(Modifier.padding(start = 88.dp, end = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.padding(start = 104.dp, end = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("@$username", color = secondaryColor)
 
                         if (user.verified == true) {
                             Spacer(Modifier.width(4.dp))
-                            Image(painterResource("verified.svg"), contentDescription = "Verified", Modifier.size(16.dp))
+                            Image(
+                                painterResource("verified.svg"),
+                                contentDescription = "Verified",
+                                Modifier.size(16.dp)
+                            )
                         }
                     }
                 }
 
                 Spacer(Modifier.height(16.dp))
+                val scope = rememberCoroutineScope()
 
                 if (user != null) {
                     if (!user.description.isNullOrBlank()) {
-                        // TODO apply entities from the entities field
-                        Text(user.description!!.trim(), Modifier.padding(start = 88.dp, end = 24.dp))
+                        val description = user.description!!.trim().injectEntities(user.entities?.description)
+                        logger.debug("Description:\n$description")
+
+                        AnnotatedText(description, Modifier.padding(start = 104.dp, end = 24.dp)) { entity ->
+                            val url = when (entity) {
+                                is ParsedEntity.Hashtag -> "https://twitter.com/hashtag/${entity.text}"
+                                is ParsedEntity.Mention -> "https://twitter.com/${entity.text}"
+                                is ParsedEntity.Url -> entity.expandedUrl.toString()
+                            }
+                            scope.launch {
+                                withContext(Dispatchers.IO) {
+                                    Desktop.getDesktop().browse(URI.create(url))
+                                }
+                            }
+                        }
                         Spacer(Modifier.height(24.dp))
                     }
 
                     if (user.publicMetrics != null) {
                         val publicMetrics = user.publicMetrics!!
                         Row(
-                            Modifier.padding(start = 88.dp, end = 24.dp),
+                            Modifier.padding(start = 104.dp, end = 24.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
@@ -341,25 +393,50 @@ internal fun MainWindowContent(viewModel: TwitterUserViewModel, modifier: Modifi
                     }
 
                     Row(
-                        Modifier.padding(start = 88.dp, end = 24.dp),
+                        Modifier.padding(start = 104.dp, end = 24.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (user.location != null) {
-                            Image(painterResource("location.svg"), contentDescription = null, modifier = Modifier.size(24.dp))
+                            Image(
+                                painterResource("location.svg"),
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp)
+                            )
                             Spacer(Modifier.width(4.dp))
                             Text(user.location!!, color = secondaryColor)
-                            Spacer(Modifier.width(16.dp))
                         }
 
-                        if (user.url != null) {
-                            Image(painterResource("url.svg"), contentDescription = null, modifier = Modifier.size(24.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text(user.entities?.url?.urls?.firstOrNull()?.displayUrl ?: user.url!!, color = secondaryColor)
+                        val userUrl = user.url.takeIf { !it.isNullOrBlank() }?.let { userUrl ->
+                            val parsedUrl = URL(userUrl)
+                            user.entities?.url?.urls?.find { it.url == parsedUrl }
+                        }
+
+                        if (userUrl != null) {
                             Spacer(Modifier.width(16.dp))
+                            Image(
+                                painterResource("url.svg"),
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = userUrl.displayUrl ?: userUrl.expandedUrl?.toString() ?: userUrl.url.toString(),
+                                color = Color(0xFF1D9BF0),
+                                modifier = Modifier
+                                    .pointerHoverIcon(PointerIconDefaults.Hand)
+                                    .clickable {
+                                        Desktop.getDesktop().browse((userUrl.expandedUrl ?: userUrl.url).toURI())
+                                    }
+                            )
                         }
 
                         if (user.createdAt != null) {
-                            Image(painterResource("joined.svg"), contentDescription = null, modifier = Modifier.size(24.dp))
+                            Spacer(Modifier.width(16.dp))
+                            Image(
+                                painterResource("joined.svg"),
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp)
+                            )
                             Spacer(Modifier.width(4.dp))
                             val createdAt = user.createdAt!!
                             Text(
@@ -374,9 +451,165 @@ internal fun MainWindowContent(viewModel: TwitterUserViewModel, modifier: Modifi
     }
 }
 
-private fun URI?.toOriginalSizePicture(): String? {
+private fun URL?.toOriginalSizePicture(): String? {
     if (this == null) return null
     return toString().replace("_normal.", ".")
+}
+
+private fun String.injectEntities(entities: FullTextEntities?): AnnotatedString {
+    if (entities == null) return AnnotatedString(this)
+
+    val allEntities =
+        (entities.urls.orEmpty() + entities.cashtags.orEmpty() + entities.hashtags.orEmpty() + entities.mentions.orEmpty())
+            .mapNotNull { ParsedEntity.parseOrNull(it) }
+            .sortedBy { it.range.first }
+
+    logger.debug("Entities:\n${allEntities.joinToString("\n") { "  - $it - Substring yields: [${substring(it.range)}]" }}")
+
+    if (allEntities.isEmpty()) return AnnotatedString(this)
+
+    val entityStyle = SpanStyle(color = Color(0xFF1D9BF0))
+
+    return buildAnnotatedString {
+        var lastPosition = 0
+        allEntities.forEach { entity ->
+            if (entity.range.first >= lastPosition) {
+                val textBeforeEntityRange = lastPosition..entity.range.first
+                append(this@injectEntities.substring(textBeforeEntityRange))
+                lastPosition += textBeforeEntityRange.last - textBeforeEntityRange.first
+            }
+
+            entity.appendTo(this, entityStyle)
+
+            lastPosition += entity.range.last - entity.range.first + 1
+        }
+    }
+}
+
+@Composable
+private fun AnnotatedText(
+    text: AnnotatedString,
+    modifier: Modifier = Modifier,
+    color: Color = Color.Unspecified,
+    fontSize: TextUnit = TextUnit.Unspecified,
+    fontStyle: FontStyle? = null,
+    fontWeight: FontWeight? = null,
+    fontFamily: FontFamily? = null,
+    letterSpacing: TextUnit = TextUnit.Unspecified,
+    textDecoration: TextDecoration? = null,
+    textAlign: TextAlign? = null,
+    lineHeight: TextUnit = TextUnit.Unspecified,
+    overflow: TextOverflow = TextOverflow.Clip,
+    softWrap: Boolean = true,
+    maxLines: Int = Int.MAX_VALUE,
+    style: androidx.compose.ui.text.TextStyle = LocalTextStyle.current,
+    onEntityAnnotationClick: (ParsedEntity) -> Unit
+) {
+    var textLayoutResult: TextLayoutResult? by remember { mutableStateOf(null) }
+
+    Text(
+        text = text,
+        modifier = modifier.pointerInput(onEntityAnnotationClick) {
+            detectTapGestures { offset ->
+                val clickedPosition = textLayoutResult?.getOffsetForPosition(offset) ?: return@detectTapGestures
+                val matchingAnnotations = text.getStringAnnotations(clickedPosition, clickedPosition)
+                    .filter { ParsedEntity.isParsedEntityAnnotation(it.tag) }
+
+                val annotation = matchingAnnotations.firstOrNull() ?: return@detectTapGestures
+                val range = annotation.start..annotation.end
+                val entity = when (annotation.tag) {
+                    ParsedEntity.Hashtag::class.java.simpleName -> ParsedEntity.Hashtag(range, annotation.item)
+                    ParsedEntity.Mention::class.java.simpleName -> ParsedEntity.Mention(range, annotation.item)
+                    ParsedEntity.Url::class.java.simpleName -> ParsedEntity.Url(
+                        range,
+                        text.substring(range),
+                        URL(annotation.item)
+                    )
+
+                    else -> error("Unhandled entity tag: ${annotation.tag} (item: ${annotation.item})")
+                }
+                onEntityAnnotationClick(entity)
+            }
+        },
+        color = color,
+        fontSize = fontSize,
+        fontStyle = fontStyle,
+        fontWeight = fontWeight,
+        fontFamily = fontFamily,
+        letterSpacing = letterSpacing,
+        textDecoration = textDecoration,
+        textAlign = textAlign,
+        lineHeight = lineHeight,
+        overflow = overflow,
+        softWrap = softWrap,
+        maxLines = maxLines,
+        onTextLayout = { result: TextLayoutResult -> textLayoutResult = result },
+        style = style
+    )
+}
+
+sealed class ParsedEntity {
+
+    abstract val range: IntRange
+    abstract val text: String
+
+    fun appendTo(builder: AnnotatedString.Builder, style: SpanStyle) = builder.apply {
+        val styleId = pushStyle(style)
+        doAppend(builder)
+        pop(styleId)
+    }
+
+    protected abstract fun doAppend(builder: AnnotatedString.Builder)
+
+    data class Hashtag(override val range: IntRange, override val text: String) : ParsedEntity() {
+
+        override fun doAppend(builder: AnnotatedString.Builder) {
+            builder.apply {
+                append(text)
+                addStringAnnotation(Hashtag::class.java.simpleName, text, range.first, range.last)
+            }
+        }
+    }
+
+    data class Mention(override val range: IntRange, override val text: String) : ParsedEntity() {
+
+        override fun doAppend(builder: AnnotatedString.Builder) {
+            builder.apply {
+                append(text)
+                addStringAnnotation(Mention::class.java.simpleName, text, range.first, range.last)
+            }
+        }
+    }
+
+    data class Url(override val range: IntRange, override val text: String, val expandedUrl: URL) : ParsedEntity() {
+
+        override fun doAppend(builder: AnnotatedString.Builder) {
+            builder.apply {
+                append(text)
+                addStringAnnotation(Url::class.java.simpleName, expandedUrl.toString(), range.first, range.last)
+            }
+        }
+    }
+
+    companion object {
+
+        fun parseOrNull(entity: Any): ParsedEntity? =
+            when (entity) {
+                is HashtagEntity -> Hashtag(entity.start..entity.end, "#${entity.tag}")
+                is CashtagEntity -> Hashtag(entity.start..entity.end, "#${entity.tag}")
+                is MentionEntity -> Mention(entity.start..entity.end, "@${entity.username}")
+                is UrlEntity -> Url(
+                    entity.start..entity.end,
+                    entity.displayUrl ?: entity.url.toString(),
+                    entity.expandedUrl ?: entity.url
+                )
+
+                else -> null
+            }
+
+        fun isParsedEntityAnnotation(tag: String) =
+            tag == Hashtag::class.java.simpleName || tag == Mention::class.java.simpleName || tag == Url::class.java.simpleName
+    }
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
