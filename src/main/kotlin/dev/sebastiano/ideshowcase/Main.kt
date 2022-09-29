@@ -70,6 +70,8 @@ import com.twitter.clientlib.model.FullTextEntities
 import com.twitter.clientlib.model.HashtagEntity
 import com.twitter.clientlib.model.MentionEntity
 import com.twitter.clientlib.model.UrlEntity
+import com.twitter.twittertext.Extractor
+import com.twitter.twittertext.Extractor.Entity
 import dev.sebastiano.ideshowcase.twitter.TwitterUserViewModel
 import dev.sebastiano.ideshowcase.twitter.asContentOrNull
 import io.chozzle.composemacostheme.MacTheme
@@ -459,12 +461,28 @@ private fun URL?.toOriginalSizePicture(): String? {
 private fun String.injectEntities(entities: FullTextEntities?): AnnotatedString {
     if (entities == null) return AnnotatedString(this)
 
-    val allEntities =
-        (entities.urls.orEmpty() + entities.cashtags.orEmpty() + entities.hashtags.orEmpty() + entities.mentions.orEmpty())
-            .mapNotNull { ParsedEntity.parseOrNull(it) }
-            .sortedBy { it.range.first }
+    data class UrlEntityData(val displayUrl: String?, val expandedUrl: URL?)
 
-    logger.debug("Entities:\n${allEntities.joinToString("\n") { "  - $it - Substring yields: [${substring(it.range)}]" }}")
+    val urlEntitiesByTcoUrl = entities.urls
+        ?.associate { it.url to UrlEntityData(it.displayUrl, it.expandedUrl) }
+        .orEmpty()
+
+    val allEntities = Extractor().extractEntitiesWithIndices(this)
+        .map {
+            if (it.type == Entity.Type.URL && it.value.isNotBlank()) {
+                val url = URL(it.value)
+                it.apply {
+                    displayURL = urlEntitiesByTcoUrl[url]?.displayUrl
+                    expandedURL = urlEntitiesByTcoUrl[url]?.expandedUrl.toString()
+                }
+            } else {
+                it
+            }
+        }
+        .mapNotNull { ParsedEntity.from(it) }
+        .sortedBy { it.range.first }
+
+    logger.debug("Entities:\n${allEntities.joinToString("\n") { "  - $it" }}")
 
     if (allEntities.isEmpty()) return AnnotatedString(this)
 
@@ -474,7 +492,7 @@ private fun String.injectEntities(entities: FullTextEntities?): AnnotatedString 
         var lastPosition = 0
         allEntities.forEach { entity ->
             if (entity.range.first >= lastPosition) {
-                val textBeforeEntityRange = lastPosition..entity.range.first
+                val textBeforeEntityRange = lastPosition until entity.range.first
                 append(this@injectEntities.substring(textBeforeEntityRange))
                 lastPosition += textBeforeEntityRange.last - textBeforeEntityRange.first
             }
@@ -522,7 +540,7 @@ private fun AnnotatedText(
                     ParsedEntity.Mention::class.java.simpleName -> ParsedEntity.Mention(range, annotation.item)
                     ParsedEntity.Url::class.java.simpleName -> ParsedEntity.Url(
                         range,
-                        text.substring(range),
+                        annotation.item,
                         URL(annotation.item)
                     )
 
@@ -609,6 +627,20 @@ sealed class ParsedEntity {
 
         fun isParsedEntityAnnotation(tag: String) =
             tag == Hashtag::class.java.simpleName || tag == Mention::class.java.simpleName || tag == Url::class.java.simpleName
+
+        fun from(entity: Entity?): ParsedEntity? =
+            when (entity?.type) {
+                Entity.Type.HASHTAG -> Hashtag(entity.start..entity.end, "#${entity.value}")
+                Entity.Type.CASHTAG -> Hashtag(entity.start..entity.end, "#${entity.value}")
+                Entity.Type.MENTION -> Mention(entity.start..entity.end, "@${entity.value}")
+                Entity.Type.URL -> Url(
+                    entity.start..entity.end,
+                    entity.displayURL,
+                    URL(entity.expandedURL)
+                )
+
+                else -> null
+            }
     }
 }
 
