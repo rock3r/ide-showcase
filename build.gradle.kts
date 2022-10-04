@@ -47,3 +47,9 @@ tasks.withType<KotlinCompile> {
 tasks.test {
     useJUnitPlatform()
 }
+
+compose.desktop {
+    application {
+        mainClass = "dev.sebastiano.ideshowcase.MainKt"
+    }
+}

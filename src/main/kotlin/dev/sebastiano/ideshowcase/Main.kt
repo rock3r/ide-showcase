@@ -1,16 +1,21 @@
 package dev.sebastiano.ideshowcase
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.FocusInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,9 +49,14 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.pointer.PointerIconDefaults
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
@@ -61,7 +71,6 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.arkivanov.decompose.extensions.compose.jetbrains.subscribeAsState
@@ -125,7 +134,10 @@ internal fun MainWindowContent(viewModel: TwitterUserViewModel, modifier: Modifi
         }
     }
 
-    Column(modifier = modifier) {
+    Column(modifier = modifier.background(Color.White)) {
+        var isSearchFocused by remember { mutableStateOf(false) }
+        println("isSearchFocused: $isSearchFocused")
+
         Row(
             modifier = Modifier.fillMaxWidth().height(51.dp).padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -135,10 +147,25 @@ internal fun MainWindowContent(viewModel: TwitterUserViewModel, modifier: Modifi
 
             Spacer(Modifier.width(16.dp))
 
+            val interactionSource = remember { MutableInteractionSource() }
+
+            LaunchedEffect(Unit) {
+                interactionSource.interactions.collect {
+                    when (it) {
+                        is FocusInteraction.Focus -> isSearchFocused = true
+                        is FocusInteraction.Unfocus -> isSearchFocused = false
+                    }
+                }
+            }
+
+            val focusManager = LocalFocusManager.current
+
             MacOutlinedTextField(
                 username,
                 onValueChange = { username = it },
-                modifier = Modifier.size(width = 200.dp, height = 26.dp),
+                modifier = Modifier.size(width = 200.dp, height = 26.dp).onKeyEvent { if (it.key == Key.Enter || it.key == Key.Escape) {
+                    focusManager.clearFocus(); true
+                } else false},
                 leadingIcon = { Text("􀊫") },
                 trailingIcon = {
                     if (username.isNotBlank()) {
@@ -147,7 +174,8 @@ internal fun MainWindowContent(viewModel: TwitterUserViewModel, modifier: Modifi
                 },
                 placeholder = { Text("Search") },
                 singleLine = true,
-                cornerRadius = SearchTextFieldCornerRadius
+                cornerRadius = SearchTextFieldCornerRadius,
+                interactionSource = interactionSource
             )
         }
 
@@ -155,119 +183,86 @@ internal fun MainWindowContent(viewModel: TwitterUserViewModel, modifier: Modifi
 
         Spacer(Modifier.height(16.dp))
 
-        when (state) {
-            is LoadableContent.Idle -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Nothing to see here", color = LocalContentColor.current.copy(alpha = ContentAlpha.disabled))
-                }
-            }
-
-            is LoadableContent.Loading -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    val transition = rememberInfiniteTransition()
-
-                    val SnapEasing = Easing { 1f }
-                    val currentRotation by transition.animateFloat(
-                        initialValue = 0f,
-                        targetValue = 360f,
-                        animationSpec = infiniteRepeatable(
-                            animation = keyframes {
-                                durationMillis = 1200
-
-                                0f at 0 with SnapEasing
-                                30f at 100 with SnapEasing
-                                60f at 200 with SnapEasing
-                                90f at 300 with SnapEasing
-                                120f at 400 with SnapEasing
-                                150f at 500 with SnapEasing
-                                180f at 600 with SnapEasing
-                                210f at 700 with SnapEasing
-                                240f at 800 with SnapEasing
-                                270f at 900 with SnapEasing
-                                300f at 1000 with SnapEasing
-                                330f at 1100 with SnapEasing
-                            }
-                        )
-                    )
-                    Image(
-                        painterResource("loading-spinner.png"),
-                        contentDescription = null,
-                        Modifier.size(48.dp).rotate(currentRotation).alpha(ContentAlpha.disabled)
-                    )
-                }
-            }
-
-            is LoadableContent.Error -> {
-                Column(
-                    Modifier.fillMaxSize().padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("Something went wrong :(", color = LocalContentColor.current.copy(alpha = ContentAlpha.disabled))
-
-                    val error = state as LoadableContent.Error
-                    if (error.retryAction != null) {
-                        TextButton(error.retryAction) {
-                            Text("Retry")
-                        }
+        Box(Modifier.fillMaxSize()) {
+            when (state) {
+                is LoadableContent.Idle -> {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Nothing to see here", color = LocalContentColor.current.copy(alpha = ContentAlpha.disabled))
                     }
-
-                    Text(
-                        text = error.message,
-                        color = LocalContentColor.current.copy(alpha = ContentAlpha.disabled),
-                        fontStyle = FontStyle.Italic,
-                        fontSize = MaterialTheme.typography.caption.fontSize,
-                        fontFamily = FontFamily.Monospace,
-                        textAlign = TextAlign.Center
-                    )
                 }
-            }
 
-            is LoadableContent.Content<*> -> {
-                val (_, user) = state.asContentOrNull<TwitterUserViewModel.StateModel>()!!.data
+                is LoadableContent.Loading -> {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        val transition = rememberInfiniteTransition()
 
-                val secondaryColor = Color(0xFF536571)
+                        val SnapEasing = Easing { 1f }
+                        val currentRotation by transition.animateFloat(
+                            initialValue = 0f,
+                            targetValue = 360f,
+                            animationSpec = infiniteRepeatable(
+                                animation = keyframes {
+                                    durationMillis = 1200
 
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 16.dp)) {
-                    if (user == null) {
-                        Box(Modifier.size(72.dp).clip(CircleShape).background(Color(0xFFCECECE))) {
-                            val transition = rememberInfiniteTransition()
-
-                            val SnapEasing = Easing { 1f }
-                            val currentRotation by transition.animateFloat(
-                                initialValue = 0f,
-                                targetValue = 360f,
-                                animationSpec = infiniteRepeatable(
-                                    animation = keyframes {
-                                        durationMillis = 1200
-
-                                        0f at 0 with SnapEasing
-                                        30f at 100 with SnapEasing
-                                        60f at 200 with SnapEasing
-                                        90f at 300 with SnapEasing
-                                        120f at 400 with SnapEasing
-                                        150f at 500 with SnapEasing
-                                        180f at 600 with SnapEasing
-                                        210f at 700 with SnapEasing
-                                        240f at 800 with SnapEasing
-                                        270f at 900 with SnapEasing
-                                        300f at 1000 with SnapEasing
-                                        330f at 1100 with SnapEasing
-                                    }
-                                )
+                                    0f at 0 with SnapEasing
+                                    30f at 100 with SnapEasing
+                                    60f at 200 with SnapEasing
+                                    90f at 300 with SnapEasing
+                                    120f at 400 with SnapEasing
+                                    150f at 500 with SnapEasing
+                                    180f at 600 with SnapEasing
+                                    210f at 700 with SnapEasing
+                                    240f at 800 with SnapEasing
+                                    270f at 900 with SnapEasing
+                                    300f at 1000 with SnapEasing
+                                    330f at 1100 with SnapEasing
+                                }
                             )
-                            Image(
-                                painterResource("loading-spinner.png"),
-                                contentDescription = null,
-                                Modifier.size(16.dp).rotate(currentRotation).padding(start = 16.dp).alpha(ContentAlpha.disabled)
-                            )
+                        )
+                        Image(
+                            painterResource("loading-spinner.png"),
+                            contentDescription = null,
+                            Modifier.size(48.dp).rotate(currentRotation).alpha(ContentAlpha.disabled)
+                        )
+                    }
+                }
+
+                is LoadableContent.Error -> {
+                    Column(
+                        Modifier.fillMaxSize().padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("Something went wrong :(", color = LocalContentColor.current.copy(alpha = ContentAlpha.disabled))
+
+                        val error = state as LoadableContent.Error
+                        if (error.retryAction != null) {
+                            TextButton(error.retryAction) {
+                                Text("Retry")
+                            }
                         }
-                    } else {
-                        KamelImage(
-                            lazyPainterResource(user.profileImageUrl.toOriginalSizePicture() ?: ""),
-                            contentDescription = "$username's profile picture",
-                            modifier = Modifier.size(72.dp).clip(CircleShape).background(Color(0xFFCECECE)),
-                            onLoading = {
+
+                        Text(
+                            text = error.message,
+                            color = LocalContentColor.current.copy(alpha = ContentAlpha.disabled),
+                            fontStyle = FontStyle.Italic,
+                            fontSize = MaterialTheme.typography.caption.fontSize,
+                            fontFamily = FontFamily.Monospace,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+
+                is LoadableContent.Content<*> -> {
+                    val (_, user) = state.asContentOrNull<TwitterUserViewModel.StateModel>()!!.data
+
+                    val secondaryColor = Color(0xFF536571)
+
+                    Column(Modifier.fillMaxSize()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        ) {
+                            if (user == null) {
                                 Box(Modifier.size(72.dp).clip(CircleShape).background(Color(0xFFCECECE))) {
                                     val transition = rememberInfiniteTransition()
 
@@ -301,155 +296,204 @@ internal fun MainWindowContent(viewModel: TwitterUserViewModel, modifier: Modifi
                                             .alpha(ContentAlpha.disabled)
                                     )
                                 }
-                            },
-                            onFailure = { error ->
-                                logger.error(
-                                    "Unable to load profile pic for $username at ${user.profileImageUrl.toOriginalSizePicture()}",
-                                    error
+                            } else {
+                                KamelImage(
+                                    lazyPainterResource(user.profileImageUrl.toOriginalSizePicture() ?: ""),
+                                    contentDescription = "$username's profile picture",
+                                    modifier = Modifier.size(72.dp).clip(CircleShape).background(Color(0xFFCECECE)),
+                                    onLoading = {
+                                        Box(Modifier.size(72.dp).clip(CircleShape).background(Color(0xFFCECECE))) {
+                                            val transition = rememberInfiniteTransition()
+
+                                            val SnapEasing = Easing { 1f }
+                                            val currentRotation by transition.animateFloat(
+                                                initialValue = 0f,
+                                                targetValue = 360f,
+                                                animationSpec = infiniteRepeatable(
+                                                    animation = keyframes {
+                                                        durationMillis = 1200
+
+                                                        0f at 0 with SnapEasing
+                                                        30f at 100 with SnapEasing
+                                                        60f at 200 with SnapEasing
+                                                        90f at 300 with SnapEasing
+                                                        120f at 400 with SnapEasing
+                                                        150f at 500 with SnapEasing
+                                                        180f at 600 with SnapEasing
+                                                        210f at 700 with SnapEasing
+                                                        240f at 800 with SnapEasing
+                                                        270f at 900 with SnapEasing
+                                                        300f at 1000 with SnapEasing
+                                                        330f at 1100 with SnapEasing
+                                                    }
+                                                )
+                                            )
+                                            Image(
+                                                painterResource("loading-spinner.png"),
+                                                contentDescription = null,
+                                                Modifier.size(16.dp).rotate(currentRotation).padding(start = 16.dp)
+                                                    .alpha(ContentAlpha.disabled)
+                                            )
+                                        }
+                                    },
+                                    onFailure = { error ->
+                                        logger.error(
+                                            "Unable to load profile pic for $username at ${user.profileImageUrl.toOriginalSizePicture()}",
+                                            error
+                                        )
+                                        Box(Modifier.size(72.dp).clip(CircleShape).background(Color(0xFFCECECE))) {
+                                            Text(
+                                                ":(",
+                                                Modifier.align(Alignment.Center),
+                                                fontSize = MaterialTheme.typography.h4.fontSize,
+                                                color = Color.Red
+                                            )
+                                        }
+                                    }
                                 )
-                                Box(Modifier.size(72.dp).clip(CircleShape).background(Color(0xFFCECECE))) {
-                                    Text(
-                                        ":(",
-                                        Modifier.align(Alignment.Center),
-                                        fontSize = MaterialTheme.typography.h4.fontSize,
-                                        color = Color.Red
+                            }
+
+                            Spacer(Modifier.width(16.dp))
+
+                            val displayedName = user?.name ?: username
+                            Text(displayedName, style = MaterialTheme.typography.h3)
+                        }
+                        if (user != null) {
+                            Row(Modifier.padding(start = 104.dp, end = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("@$username", color = secondaryColor)
+
+                                if (user.verified == true) {
+                                    Spacer(Modifier.width(4.dp))
+                                    Image(
+                                        painterResource("verified.svg"),
+                                        contentDescription = "Verified",
+                                        Modifier.size(16.dp)
                                     )
                                 }
                             }
-                        )
-                    }
-
-                    Spacer(Modifier.width(16.dp))
-
-                    val displayedName = user?.name ?: username
-                    Text(displayedName, style = MaterialTheme.typography.h3)
-                }
-
-                if (user != null) {
-                    Row(Modifier.padding(start = 104.dp, end = 24.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("@$username", color = secondaryColor)
-
-                        if (user.verified == true) {
-                            Spacer(Modifier.width(4.dp))
-                            Image(
-                                painterResource("verified.svg"),
-                                contentDescription = "Verified",
-                                Modifier.size(16.dp)
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(16.dp))
-                val scope = rememberCoroutineScope()
-
-                if (user != null) {
-                    if (!user.description.isNullOrBlank()) {
-                        val description = user.description!!.trim().injectEntities(user.entities?.description)
-                        logger.debug("Description:\n$description")
-
-                        AnnotatedText(description, Modifier.padding(start = 104.dp, end = 24.dp)) { entity ->
-                            val url = when (entity) {
-                                is ParsedEntity.Hashtag -> "https://twitter.com/hashtag/${entity.text}"
-                                is ParsedEntity.Mention -> "https://twitter.com/${entity.text}"
-                                is ParsedEntity.Url -> entity.expandedUrl.toString()
-                            }
-                            scope.launch {
-                                withContext(Dispatchers.IO) {
-                                    Desktop.getDesktop().browse(URI.create(url))
-                                }
-                            }
-                        }
-                        Spacer(Modifier.height(24.dp))
-                    }
-
-                    if (user.publicMetrics != null) {
-                        val publicMetrics = user.publicMetrics!!
-                        Row(
-                            Modifier.padding(start = 104.dp, end = 24.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            Text(
-                                buildAnnotatedString {
-                                    pushStyle(SpanStyle(fontWeight = FontWeight.SemiBold))
-                                    append(publicMetrics.followingCount.toString())
-                                    pop()
-                                    pushStyle(SpanStyle(color = secondaryColor))
-                                    append(" following")
-                                }
-                            )
-
-                            Text(
-                                buildAnnotatedString {
-                                    pushStyle(SpanStyle(fontWeight = FontWeight.SemiBold))
-                                    append(publicMetrics.followersCount.toString())
-                                    pop()
-                                    pushStyle(SpanStyle(color = secondaryColor))
-                                    append(" followers")
-                                }
-                            )
                         }
 
-                        Spacer(Modifier.height(8.dp))
-                    }
+                        Spacer(Modifier.height(16.dp))
+                        val scope = rememberCoroutineScope()
 
-                    Row(
-                        Modifier.padding(start = 104.dp, end = 24.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (user.location != null) {
-                            Image(
-                                painterResource("location.svg"),
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Text(user.location!!, color = secondaryColor)
-                        }
+                        if (user != null) {
+                            if (!user.description.isNullOrBlank()) {
+                                val description = user.description!!.trim().injectEntities(user.entities?.description)
+                                logger.debug("Description:\n$description")
 
-                        val userUrl = user.url.takeIf { !it.isNullOrBlank() }?.let { userUrl ->
-                            val parsedUrl = URL(userUrl)
-                            user.entities?.url?.urls?.find { it.url == parsedUrl }
-                        }
-
-                        if (userUrl != null) {
-                            Spacer(Modifier.width(16.dp))
-                            Image(
-                                painterResource("url.svg"),
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Text(
-                                text = userUrl.displayUrl ?: userUrl.expandedUrl?.toString() ?: userUrl.url.toString(),
-                                color = Color(0xFF1D9BF0),
-                                modifier = Modifier
-                                    .pointerHoverIcon(PointerIconDefaults.Hand)
-                                    .clickable {
-                                        Desktop.getDesktop().browse((userUrl.expandedUrl ?: userUrl.url).toURI())
+                                AnnotatedText(description, Modifier.padding(start = 104.dp, end = 24.dp)) { entity ->
+                                    val url = when (entity) {
+                                        is ParsedEntity.Hashtag -> "https://twitter.com/hashtag/${entity.text}"
+                                        is ParsedEntity.Mention -> "https://twitter.com/${entity.text}"
+                                        is ParsedEntity.Url -> entity.expandedUrl.toString()
                                     }
-                            )
-                        }
+                                    scope.launch {
+                                        withContext(Dispatchers.IO) {
+                                            Desktop.getDesktop().browse(URI.create(url))
+                                        }
+                                    }
+                                }
+                                Spacer(Modifier.height(24.dp))
+                            }
 
-                        if (user.createdAt != null) {
-                            Spacer(Modifier.width(16.dp))
-                            Image(
-                                painterResource("joined.svg"),
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            val createdAt = user.createdAt!!
-                            Text(
-                                "Joined ${createdAt.month.getDisplayName(TextStyle.FULL, Locale.getDefault())} ${createdAt.year}",
-                                color = secondaryColor
-                            )
+                            if (user.publicMetrics != null) {
+                                val publicMetrics = user.publicMetrics!!
+                                Row(
+                                    Modifier.padding(start = 104.dp, end = 24.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    Text(
+                                        buildAnnotatedString {
+                                            pushStyle(SpanStyle(fontWeight = FontWeight.SemiBold))
+                                            append(publicMetrics.followingCount.toString())
+                                            pop()
+                                            pushStyle(SpanStyle(color = secondaryColor))
+                                            append(" following")
+                                        }
+                                    )
+
+                                    Text(
+                                        buildAnnotatedString {
+                                            pushStyle(SpanStyle(fontWeight = FontWeight.SemiBold))
+                                            append(publicMetrics.followersCount.toString())
+                                            pop()
+                                            pushStyle(SpanStyle(color = secondaryColor))
+                                            append(" followers")
+                                        }
+                                    )
+                                }
+
+                                Spacer(Modifier.height(8.dp))
+                            }
+
+                            Row(
+                                Modifier.padding(start = 104.dp, end = 24.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (user.location != null) {
+                                    Image(
+                                        painterResource("location.svg"),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(user.location!!, color = secondaryColor)
+                                }
+
+                                val userUrl = user.url.takeIf { !it.isNullOrBlank() }?.let { userUrl ->
+                                    val parsedUrl = URL(userUrl)
+                                    user.entities?.url?.urls?.find { it.url == parsedUrl }
+                                }
+
+                                if (userUrl != null) {
+                                    Spacer(Modifier.width(16.dp))
+                                    Image(
+                                        painterResource("url.svg"),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = userUrl.displayUrl ?: userUrl.expandedUrl?.toString() ?: userUrl.url.toString(),
+                                        color = Color(0xFF1D9BF0),
+                                        modifier = Modifier
+                                            .pointerHoverIcon(PointerIconDefaults.Hand)
+                                            .clickable {
+                                                Desktop.getDesktop().browse((userUrl.expandedUrl ?: userUrl.url).toURI())
+                                            }
+                                    )
+                                }
+
+                                if (user.createdAt != null) {
+                                    Spacer(Modifier.width(16.dp))
+                                    Image(
+                                        painterResource("joined.svg"),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    val createdAt = user.createdAt!!
+                                    Text(
+                                        "Joined ${createdAt.month.getDisplayName(TextStyle.FULL, Locale.getDefault())} ${createdAt.year}",
+                                        color = secondaryColor
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
+
+            Scrim(isSearchFocused)
         }
+    }
+}
+
+@Composable
+private fun Scrim(isSearchFocused: Boolean) {
+    AnimatedVisibility(isSearchFocused, enter = fadeIn(), exit = fadeOut()) {
+        Box(Modifier.background(Color(0x80000000)).fillMaxSize())
     }
 }
 
@@ -650,8 +694,20 @@ private fun CloseIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    contentPadding: PaddingValues = PaddingValues(0.dp)
+    contentPadding: PaddingValues = PaddingValues(4.dp)
 ) {
+    var isPressed by remember { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
+
+    LaunchedEffect(Unit) {
+        interactionSource.interactions.collect {
+            when (it) {
+                is PressInteraction.Press -> isPressed = true
+                is PressInteraction.Release, is PressInteraction.Cancel -> isPressed = false
+            }
+        }
+    }
+
     Box(
         modifier = modifier
             .pointerHoverIcon(PointerIconDefaults.Default)
@@ -659,12 +715,13 @@ private fun CloseIconButton(
                 onClick = onClick,
                 enabled = enabled,
                 role = Role.Button,
-                interactionSource = remember { MutableInteractionSource() },
+                interactionSource = interactionSource,
                 indication = null
             )
+            .background(if (isPressed) Color(0xFF252326) else Color(0xFF6F6D6F), CircleShape)
             .padding(contentPadding),
     ) {
-        Text("\uDBC0\uDD84", fontSize = 10.sp, fontWeight = FontWeight.W700)
+        Image(painterResource("clear.svg"), "Clear", modifier = Modifier.size(6.dp), colorFilter = ColorFilter.tint(Color.White))
     }
 }
 
